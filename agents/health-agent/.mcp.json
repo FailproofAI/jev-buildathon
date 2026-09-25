@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "health": { "command": "node", "args": ["server.mjs"] }
+  }
+}
