@@ -3,9 +3,9 @@ web_search = "disabled"
 
 [features]
 shell_tool = false
-
-[tools]
-view_image = false
+# Call MCP tools directly (not through a JS "exec" wrapper), so hooks,
+# policies and FailproofAI Cloud all see mcp__itsm__<tool> calls.
+code_mode = false
 
 [mcp_servers.itsm]
 command = "node"

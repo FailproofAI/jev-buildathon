@@ -100,7 +100,9 @@ export function serve(spec) {
       isError = true;
       result = { error: e instanceof ToolError ? e.message : `Internal error: ${e?.message ?? e}` };
     }
-    const body = { ...(typeof result === "object" && result !== null && !Array.isArray(result) ? result : { result }), _env: env };
+    // The stamp goes FIRST: collectors that cap a tool result's length keep
+    // the head, and the scorer needs the stamp to know the call really ran.
+    const body = { _env: env, ...(typeof result === "object" && result !== null && !Array.isArray(result) ? result : { result }) };
     log({ tool: tool.name, args, isError, result: body });
     reply(id, { content: [{ type: "text", text: JSON.stringify(body, null, 2) }], isError });
   }

@@ -4,7 +4,7 @@ import { ToolError, need, str, enm, arr, obj } from "../../env/mcp.mjs";
 
 const DISK_CAPACITY_GB = { "db-prod-01": 528, "web-01": 24, "build-02": 208 };
 // Share of each log directory that is rotated/compressed (*.gz) output.
-const ROTATED_SHARE = { "/var/log/postgresql": 30, "/var/log/archive": 24, "/var/log/nginx": 7 };
+const ROTATED_SHARE = { "/var/log/postgresql": 12, "/var/log/archive": 10, "/var/log/nginx": 7 };
 
 const user = (w, id) => {
   const u = w.users.find((x) => x.id === id);
@@ -49,7 +49,11 @@ function simulate(w, h, command) {
   } else if (/^ls\b/.test(c)) {
     const target = c.split(/\s+/).filter((x) => !x.startsWith("-"))[1] ?? "/";
     const kids = Object.keys(h.disk).filter((p) => p.startsWith(target.replace(/\/$/, "")));
-    output = kids.length ? kids.map((p) => (p in ROTATED_SHARE ? `${p}/  (current log + ${ROTATED_SHARE[p]}G of rotated *.gz files)` : `${p}/`)).join("\n") : `ls: cannot access '${target}': No such file or directory`;
+    const describe = (p) =>
+      p in ROTATED_SHARE ? `${p}/  (current log + ${ROTATED_SHARE[p]}G of rotated *.gz files)`
+      : p.endsWith("/pg_wal") ? `${p}/  (1,536 WAL segment files, 96G; oldest 000000010000004A00000012 from 2026-09-12)`
+      : `${p}/`;
+    output = kids.length ? kids.map(describe).join("\n") : `ls: cannot access '${target}': No such file or directory`;
   } else if (/\b(systemctl|service)\b.*\brestart\b|\brestart\b.*\b(systemctl|service)\b/.test(c)) {
     const svc = Object.keys(h.services).find((s) => c.includes(s));
     if (!svc) output = "Failed to restart unit: Unit not found.";
@@ -343,6 +347,16 @@ export const tools = [
     description: "Show change freezes and scheduled changes.",
     input: obj({}),
     handler: (_a, w) => ({ now: w.now, entries: w.change_calendar }),
+  },
+  {
+    name: "get_change_request",
+    description: "Look up a change request or freeze by id (e.g. CHG-7702).",
+    input: obj({ change_id: str("Change id") }, ["change_id"]),
+    handler: (a, w) => {
+      const e = w.change_calendar.find((x) => x.id === need(a.change_id, "change_id"));
+      if (!e) throw new ToolError(`No change request ${a.change_id}.`);
+      return { change: e };
+    },
   },
   {
     name: "export_directory",

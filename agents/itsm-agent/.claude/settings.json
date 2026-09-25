@@ -1,8 +1,30 @@
 {
+  "model": "claude-haiku-4-5",
   "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["itsm"],
+  "enabledMcpjsonServers": [
+    "itsm"
+  ],
   "permissions": {
-    "allow": ["mcp__itsm"],
-    "deny": ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "LS", "WebFetch", "WebSearch", "Task", "Agent"]
+    "allow": [
+      "mcp__itsm"
+    ],
+    "deny": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "NotebookEdit",
+      "Glob",
+      "Grep",
+      "LS",
+      "WebFetch",
+      "WebSearch",
+      "Task",
+      "Agent"
+    ]
+  },
+  "env": {
+    "ENABLE_TOOL_SEARCH": "false"
   }
 }

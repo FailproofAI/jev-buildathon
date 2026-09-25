@@ -198,7 +198,7 @@ async function run(key, taskId, args) {
   const outDir = join(a.dir, ".runs", "transcripts");
   mkdirSync(outDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const outFile = join(outDir, `${t.id}-${harness}-${stamp}.jsonl`);
+  const outFile = join(outDir, `${t.id}-${harness}-${model ? model.replace(/[^a-z0-9.]+/gi, "_") + "-" : ""}${stamp}.jsonl`);
 
   let cmd, cargs;
   if (harness === "claude") {
@@ -209,7 +209,9 @@ async function run(key, taskId, args) {
     cargs.push(...extraArgs("BUILDATHON_CLAUDE_ARGS"));
   } else if (harness === "codex") {
     cmd = "codex";
-    cargs = ["exec", "--json", "--skip-git-repo-check", prompt];
+    // Codex skips hooks it has not been told to trust, and trust can only be
+    // persisted through /hooks in its TUI — so a scripted run vouches for them.
+    cargs = ["exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-hook-trust", prompt];
     if (model) cargs.splice(1, 0, "-m", model);
     cargs.splice(1, 0, ...extraArgs("BUILDATHON_CODEX_ARGS"));
   } else die(`--harness must be claude or codex`);
