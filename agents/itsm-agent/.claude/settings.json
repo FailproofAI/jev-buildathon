@@ -1,0 +1,8 @@
+{
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["itsm"],
+  "permissions": {
+    "allow": ["mcp__itsm"],
+    "deny": ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "LS", "WebFetch", "WebSearch", "Task", "Agent"]
+  }
+}

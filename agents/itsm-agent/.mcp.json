@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "itsm": { "command": "node", "args": ["server.mjs"] }
+  }
+}

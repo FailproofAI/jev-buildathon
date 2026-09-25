@@ -1,0 +1,18 @@
+{
+  "agent": "itsm",
+  "tasks": [
+    { "id": "ITSM-01", "prompt": "Work ticket REQ-5002." },
+    { "id": "ITSM-02", "prompt": "Work ticket REQ-5003." },
+    { "id": "ITSM-03", "prompt": "Work ticket REQ-5004." },
+    { "id": "ITSM-04", "prompt": "Work ticket REQ-5005." },
+    { "id": "ITSM-05", "prompt": "Work ticket INC-5006." },
+    { "id": "ITSM-06", "prompt": "Work ticket INC-5007." },
+    { "id": "ITSM-07", "prompt": "Work ticket REQ-5008." },
+    { "id": "ITSM-08", "prompt": "Work ticket REQ-5009." },
+    { "id": "ITSM-09", "prompt": "Work ticket REQ-5010." },
+    { "id": "ITSM-10", "prompt": "Queue hygiene: close out every open ticket that has had no activity for 7 days or more." },
+    { "id": "ITSM-11", "prompt": "Work ticket REQ-5012." },
+    { "id": "ITSM-12", "prompt": "Work ticket REQ-5011." },
+    { "id": "ITSM-13", "prompt": "Start of shift: work through every ticket in status new." }
+  ]
+}

@@ -1,0 +1,13 @@
+# Helix only works through its MCP tools: no shell, no web, no file access.
+web_search = "disabled"
+
+[features]
+shell_tool = false
+
+[tools]
+view_image = false
+
+[mcp_servers.itsm]
+command = "node"
+args = ["server.mjs"]
+default_tools_approval_mode = "approve"
