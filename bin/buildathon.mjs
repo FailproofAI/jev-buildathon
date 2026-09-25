@@ -6,6 +6,7 @@
 //   buildathon tasks [agent]         list tasks
 //   buildathon run <agent> <task> [--harness claude|codex] [--model <m>]
 //   buildathon log <agent> [--last N]  show the tool calls of recent runs
+//   buildathon unlock <passphrase>   open the sealed final round (announced at the event)
 //
 // Agents: itsm, legal, health, finance.
 
@@ -14,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync,
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { finalRound, unseal } from "../env/final.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const AGENTS_DIR = join(REPO, "agents");
@@ -31,8 +33,10 @@ function agents() {
   return readdirSync(AGENTS_DIR)
     .filter((d) => existsSync(join(AGENTS_DIR, d, "tasks.json")))
     .map((d) => {
-      const tasks = JSON.parse(readFileSync(join(AGENTS_DIR, d, "tasks.json"), "utf8"));
-      return { key: tasks.agent, dir: join(AGENTS_DIR, d), tasks: tasks.tasks };
+      const dir = join(AGENTS_DIR, d);
+      const tasks = JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8"));
+      const final = finalRound(dir);
+      return { key: tasks.agent, dir, tasks: [...tasks.tasks, ...(final?.tasks ?? []).map((t) => ({ ...t, final: true }))], sealed: existsSync(join(dir, "final.enc")) && !final };
     });
 }
 
@@ -159,7 +163,8 @@ function doctor() {
 function tasks(key) {
   for (const a of key ? [agent(key)] : agents()) {
     console.log(c.bold(`${a.key}`) + c.dim(`  (${a.dir})`));
-    for (const t of a.tasks) console.log(`  ${c.bold(t.id.padEnd(10))} ${t.prompt}`);
+    for (const t of a.tasks) console.log(`  ${c.bold(t.id.padEnd(10))} ${t.final ? c.yellow("[final] ") : ""}${t.prompt}`);
+    if (a.sealed) console.log(c.dim("  (final-round tasks are sealed — `buildathon unlock <passphrase>` when it is announced)"));
   }
 }
 
@@ -274,6 +279,27 @@ function log(key, args) {
   }
 }
 
+function unlock(passphrase) {
+  if (!passphrase) die("usage: buildathon unlock <passphrase>");
+  let n = 0;
+  for (const a of agents()) {
+    const enc = join(a.dir, "final.enc");
+    if (!existsSync(enc)) continue;
+    let plain;
+    try {
+      plain = unseal(readFileSync(enc, "utf8"), passphrase);
+    } catch {
+      die(`Wrong passphrase (could not open ${a.key}'s final round).`);
+    }
+    writeFileSync(join(a.dir, "final.json"), plain);
+    const tasks = JSON.parse(plain).tasks ?? [];
+    console.log(`  ${c.green("✓")} ${a.key}: ${tasks.length} final-round tasks — ${tasks.map((t) => t.id).join(", ")}`);
+    n++;
+  }
+  if (!n) die("No sealed final round found.");
+  console.log(`\nFinal round unlocked. Every session on these tasks counts. ${c.bold("buildathon tasks <agent>")} to see them.`);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case "setup": setup(); break;
@@ -281,6 +307,7 @@ switch (cmd) {
   case "tasks": tasks(rest[0]); break;
   case "run": await run(rest[0], rest[1], rest.slice(2)); break;
   case "log": log(rest[0], rest.slice(1)); break;
+  case "unlock": unlock(rest[0]); break;
   default:
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 }
