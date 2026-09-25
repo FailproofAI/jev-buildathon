@@ -7,6 +7,7 @@
 //   buildathon run <agent> <task> [--harness claude|codex] [--model <m>]
 //   buildathon log <agent> [--last N]  show the tool calls of recent runs
 //   buildathon unlock <passphrase>   open the sealed final round (announced at the event)
+//   buildathon pack <team>           bundle your policies into one file for the review
 //
 // Agents: itsm, legal, health, finance.
 
@@ -300,6 +301,25 @@ function unlock(passphrase) {
   console.log(`\nFinal round unlocked. Every session on these tasks counts. ${c.bold("buildathon tasks <agent>")} to see them.`);
 }
 
+/** Bundle every agent's policies into one Markdown file for the organisers' review. */
+function pack(team) {
+  if (!team) die("usage: buildathon pack <team-name>");
+  const parts = [`# Buildathon submission — ${team}\n`, `Generated ${new Date().toISOString()}\n`];
+  let files = 0;
+  for (const a of agents()) {
+    const dir = join(a.dir, ".failproofai", "policies");
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).filter((x) => /\.(mjs|js|ts)$/.test(x)).sort()) {
+      parts.push(`\n## ${a.key} — ${f}\n\n\`\`\`js\n${readFileSync(join(dir, f), "utf8").trimEnd()}\n\`\`\`\n`);
+      files++;
+    }
+  }
+  if (!files) die("No policy files found under agents/*/.failproofai/policies/.");
+  const out = join(REPO, `submission-${team.replace(/[^a-z0-9_-]+/gi, "_")}.md`);
+  writeFileSync(out, parts.join(""));
+  console.log(`${c.green("✓")} ${files} policy files → ${out}\nUpload this file where the organisers tell you. Your Jev evaluations are read straight from FailproofAI Cloud.`);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case "setup": setup(); break;
@@ -308,6 +328,7 @@ switch (cmd) {
   case "run": await run(rest[0], rest[1], rest.slice(2)); break;
   case "log": log(rest[0], rest.slice(1)); break;
   case "unlock": unlock(rest[0]); break;
+  case "pack": pack(rest[0]); break;
   default:
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 }
