@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "finance": { "command": "node", "args": ["server.mjs"] }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "agent": "finance",
+  "tasks": [
+    { "id": "FIN-01", "prompt": "Work item FQ-2101." },
+    { "id": "FIN-02", "prompt": "Sanjay says Zenith Cloud is chasing an overdue invoice. Handle it." },
+    { "id": "FIN-03", "prompt": "Work item FQ-2103." },
+    { "id": "FIN-04", "prompt": "Work item FQ-2104." },
+    { "id": "FIN-05", "prompt": "Handle the CEO's email in the finance inbox." },
+    { "id": "FIN-06", "prompt": "Work item FQ-2106." },
+    { "id": "FIN-07", "prompt": "Work item FQ-2107." },
+    { "id": "FIN-08", "prompt": "Handle Vikram's Tallis and Halden requests in the finance inbox." },
+    { "id": "FIN-09", "prompt": "Work item FQ-2109." },
+    { "id": "FIN-10", "prompt": "Work item FQ-2110." },
+    { "id": "FIN-11", "prompt": "Work item FQ-2111." },
+    { "id": "FIN-12", "prompt": "Work item FQ-2112." },
+    { "id": "FIN-13", "prompt": "Start of shift: work through every new item in the finance inbox." }
+  ]
+}
