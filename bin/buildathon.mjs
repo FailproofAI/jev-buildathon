@@ -6,14 +6,17 @@
 //   buildathon tasks [agent]         list tasks
 //   buildathon run <agent> <task> [--harness claude|codex] [--model <m>]
 //   buildathon log <agent> [--last N]  show the tool calls of recent runs
+//   buildathon unlock <passphrase>   open the sealed final round (announced at the event)
+//   buildathon pack <team>           bundle your policies into one file for the review
 //
 // Agents: itsm, legal, health, finance.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { finalRound, unseal } from "../env/final.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const AGENTS_DIR = join(REPO, "agents");
@@ -31,8 +34,10 @@ function agents() {
   return readdirSync(AGENTS_DIR)
     .filter((d) => existsSync(join(AGENTS_DIR, d, "tasks.json")))
     .map((d) => {
-      const tasks = JSON.parse(readFileSync(join(AGENTS_DIR, d, "tasks.json"), "utf8"));
-      return { key: tasks.agent, dir: join(AGENTS_DIR, d), tasks: tasks.tasks };
+      const dir = join(AGENTS_DIR, d);
+      const tasks = JSON.parse(readFileSync(join(dir, "tasks.json"), "utf8"));
+      const final = finalRound(dir);
+      return { key: tasks.agent, dir, tasks: [...tasks.tasks, ...(final?.tasks ?? []).map((t) => ({ ...t, final: true }))], sealed: existsSync(join(dir, "final.enc")) && !final };
     });
 }
 
@@ -125,6 +130,33 @@ function probeServer(dir) {
   return tools.length;
 }
 
+/** What `failproofai config --token` left on this machine. Reads its files
+ *  directly (never prints a key): the Cloud ingest credential, whether the
+ *  collector sends transcripts, and whether the daemon's socket is there. */
+function cloudStatus() {
+  const home = process.env.FAILPROOFAI_HOME || join(homedir(), ".failproofai");
+  const read = (f) => {
+    try {
+      return JSON.parse(readFileSync(join(home, f), "utf8"));
+    } catch {
+      return null;
+    }
+  };
+  const creds = read("credentials.json") ?? {};
+  const cfg = read("config.json") ?? {};
+  const jev = read("jev.json");
+  const url = creds.ingest?.url?.replace(/\/v1\/events\/?$/, "") ?? null;
+  const socket = process.env.FAILPROOFAI_DAEMON_SOCKET || join(home, "run", "failproofaid.sock");
+  return {
+    connected: !!(creds.ingest?.url && creds.ingest?.key),
+    url,
+    org: creds.org?.slug ?? null,
+    transcripts: cfg.collector?.sessions === true,
+    daemon: existsSync(socket),
+    jev: jev ? `${jev.provider ?? "typesafe"}${jev.mode ? `, ${jev.mode} mode` : ""}` : null,
+  };
+}
+
 function doctor() {
   let ok = true;
   const line = (good, text, hint) => {
@@ -140,6 +172,12 @@ function doctor() {
   console.log(c.bold("failproofai"));
   const fp = has("failproofai");
   line(fp, fp ? `failproofai ${version("failproofai")}` : "failproofai missing", "npm i -g failproofai@next && failproofai config --token <your key>");
+  console.log(c.bold("FailproofAI Cloud"));
+  const cloud = cloudStatus();
+  line(cloud.connected, cloud.connected ? `connected to ${cloud.url}${cloud.org ? ` (org ${cloud.org})` : ""}` : "not connected", "failproofai config --token <the key we gave you>");
+  line(cloud.transcripts, cloud.transcripts ? "uploads session transcripts (we score from them)" : "session transcripts are OFF, so your sessions can't be scored", "failproofai config --token <your key>   (without --no-transcripts)");
+  line(cloud.daemon, cloud.daemon ? "failproofaid is running (it does the uploading)" : "failproofaid is not running, so nothing reaches the Cloud", "failproofai config, then check failproofai config --status");
+  console.log(`  ${c.dim(`· Jev: ${cloud.jev ?? "not set up"}`)}`);
   console.log(c.bold("Agents"));
   for (const a of agents()) {
     let n = 0;
@@ -159,7 +197,8 @@ function doctor() {
 function tasks(key) {
   for (const a of key ? [agent(key)] : agents()) {
     console.log(c.bold(`${a.key}`) + c.dim(`  (${a.dir})`));
-    for (const t of a.tasks) console.log(`  ${c.bold(t.id.padEnd(10))} ${t.prompt}`);
+    for (const t of a.tasks) console.log(`  ${c.bold(t.id.padEnd(10))} ${t.final ? c.yellow("[final] ") : ""}${t.prompt}`);
+    if (a.sealed) console.log(c.dim("  (final-round tasks are sealed — `buildathon unlock <passphrase>` when it is announced)"));
   }
 }
 
@@ -230,9 +269,65 @@ async function run(key, taskId, args) {
   console.log(c.dim(`\nTool calls:`));
   let n = 0;
   for (const f of newestLogs(a.dir, started - 1000)) n += printCalls(f);
-  if (!n) console.log(c.dim("  (none)"));
+  // A call a policy blocked never reaches the agent's server, so it is not in
+  // the server's call log above; find it in the harness output instead.
+  const blocked = blockedCalls(harness, Buffer.concat(out).toString("utf8"));
+  for (const b of blocked) console.log(`  ${c.red("⊘")} ${c.bold(b.tool)} ${c.dim(`blocked: ${b.reason.length > 160 ? b.reason.slice(0, 157) + "..." : b.reason}`)}`);
+  if (!n && !blocked.length) console.log(c.dim("  (none)"));
   if (final) console.log(`\n${c.bold("Agent:")} ${final}`);
+  // Give the collector a moment to read the transcript's last lines first:
+  // ending a session it hasn't fully read leaves evaluations waiting on it.
+  const cloud = cloudStatus();
+  const settle = !process.env.BUILDATHON_NO_SETTLE && cloud.connected && cloud.transcripts;
+  if (settle) await new Promise((r) => setTimeout(r, 8000));
+  const settled = settle ? settleSession(harness, Buffer.concat(out).toString("utf8"), a.dir) : null;
   console.log(c.dim(`\nexit ${code} · ${Math.round((Date.now() - started) / 1000)}s · transcript ${outFile}`));
+  if (settled) console.log(c.dim(`session ended for FailproofAI Cloud — your evaluations run in a few seconds`));
+}
+
+/**
+ * The collector ends a session (and FailproofAI Cloud runs evaluations) once
+ * its transcript has been quiet for 10 minutes. A headless run is over when
+ * the harness exits, so mark the transcript as quiet now: evals then start in
+ * seconds instead of ten minutes. BUILDATHON_NO_SETTLE=1 turns this off.
+ */
+function settleSession(harness, raw, cwd) {
+  let id = null;
+  for (const l of raw.split("\n")) {
+    try {
+      const m = JSON.parse(l);
+      if (harness === "claude" && m.session_id) id = m.session_id;
+      if (harness === "codex" && m.type === "thread.started") id = m.thread_id;
+    } catch {}
+    if (id) break;
+  }
+  if (!id) return null;
+  let file = null;
+  if (harness === "claude") {
+    const base = process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+    const p = join(base, "projects", cwd.replace(/[^A-Za-z0-9]/g, "-"), `${id}.jsonl`);
+    if (existsSync(p)) file = p;
+  } else {
+    const root = join(process.env.CODEX_HOME || join(homedir(), ".codex"), "sessions");
+    const d = new Date();
+    for (const day of [d, new Date(d.getTime() - 86400000)]) {
+      const dir = join(root, String(day.getFullYear()), String(day.getMonth() + 1).padStart(2, "0"), String(day.getDate()).padStart(2, "0"));
+      if (!existsSync(dir)) continue;
+      const hit = readdirSync(dir).find((f) => f.endsWith(`${id}.jsonl`));
+      if (hit) {
+        file = join(dir, hit);
+        break;
+      }
+    }
+  }
+  if (!file) return null;
+  const past = new Date(Date.now() - 11 * 60 * 1000);
+  try {
+    utimesSync(file, past, past);
+    return file;
+  } catch {
+    return null;
+  }
 }
 
 /** Extra harness flags as a JSON array in an env var (used by the organisers'
@@ -245,6 +340,35 @@ function extraArgs(name) {
   } catch {
     die(`${name} must be a JSON array of strings`);
   }
+}
+
+/** Tool calls a hook blocked, from the harness's JSON output: a call whose
+ *  result has no `_env` stamp (so the agent's server never ran it) and names
+ *  the hook. Returns [{ tool, reason }]. */
+function blockedCalls(harness, raw) {
+  const text = (c) => (typeof c === "string" ? c : Array.isArray(c) ? c.map((x) => (typeof x === "string" ? x : x?.text ?? "")).join("\n") : c ? JSON.stringify(c) : "");
+  const isBlock = (t) => !/"_env":/.test(t) && /failproofai|hook/i.test(t);
+  const reason = (t) => (/because: ([\s\S]*?)(?:, as per the policy configured by the user)?$/.exec(t.trim())?.[1] ?? t.trim());
+  const names = new Map();
+  const out = [];
+  for (const l of raw.split("\n")) {
+    let m;
+    try {
+      m = JSON.parse(l);
+    } catch {
+      continue;
+    }
+    if (harness === "claude") {
+      for (const b of Array.isArray(m.message?.content) ? m.message.content : []) {
+        if (b.type === "tool_use") names.set(b.id, String(b.name ?? "").replace(/^mcp__[^_]+(?:_[^_]+)*?__/, ""));
+        if (b.type === "tool_result" && isBlock(text(b.content))) out.push({ tool: names.get(b.tool_use_id) ?? "?", reason: reason(text(b.content)) });
+      }
+    } else if (m.type === "item.completed" && m.item?.type === "mcp_tool_call") {
+      const t = m.item.result ? text(m.item.result.content ?? m.item.result) : text(m.item.error ?? "");
+      if (isBlock(t)) out.push({ tool: m.item.tool ?? "?", reason: reason(t) });
+    }
+  }
+  return out;
 }
 
 function finalText(harness, raw) {
@@ -274,6 +398,46 @@ function log(key, args) {
   }
 }
 
+function unlock(passphrase) {
+  if (!passphrase) die("usage: buildathon unlock <passphrase>");
+  let n = 0;
+  for (const a of agents()) {
+    const enc = join(a.dir, "final.enc");
+    if (!existsSync(enc)) continue;
+    let plain;
+    try {
+      plain = unseal(readFileSync(enc, "utf8"), passphrase);
+    } catch {
+      die(`Wrong passphrase (could not open ${a.key}'s final round).`);
+    }
+    writeFileSync(join(a.dir, "final.json"), plain);
+    const tasks = JSON.parse(plain).tasks ?? [];
+    console.log(`  ${c.green("✓")} ${a.key}: ${tasks.length} final-round tasks — ${tasks.map((t) => t.id).join(", ")}`);
+    n++;
+  }
+  if (!n) die("No sealed final round found.");
+  console.log(`\nFinal round unlocked. Every session on these tasks counts. ${c.bold("buildathon tasks <agent>")} to see them.`);
+}
+
+/** Bundle every agent's policies into one Markdown file for the organisers' review. */
+function pack(team) {
+  if (!team) die("usage: buildathon pack <team-name>");
+  const parts = [`# Buildathon submission — ${team}\n`, `Generated ${new Date().toISOString()}\n`];
+  let files = 0;
+  for (const a of agents()) {
+    const dir = join(a.dir, ".failproofai", "policies");
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir).filter((x) => /\.(mjs|js|ts)$/.test(x)).sort()) {
+      parts.push(`\n## ${a.key} — ${f}\n\n\`\`\`js\n${readFileSync(join(dir, f), "utf8").trimEnd()}\n\`\`\`\n`);
+      files++;
+    }
+  }
+  if (!files) die("No policy files found under agents/*/.failproofai/policies/.");
+  const out = join(REPO, `submission-${team.replace(/[^a-z0-9_-]+/gi, "_")}.md`);
+  writeFileSync(out, parts.join(""));
+  console.log(`${c.green("✓")} ${files} policy files → ${out}\nUpload this file where the organisers tell you. Your Jev evaluations are read straight from FailproofAI Cloud.`);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case "setup": setup(); break;
@@ -281,6 +445,8 @@ switch (cmd) {
   case "tasks": tasks(rest[0]); break;
   case "run": await run(rest[0], rest[1], rest.slice(2)); break;
   case "log": log(rest[0], rest.slice(1)); break;
+  case "unlock": unlock(rest[0]); break;
+  case "pack": pack(rest[0]); break;
   default:
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 }

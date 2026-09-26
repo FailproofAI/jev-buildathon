@@ -1,9 +1,18 @@
 // Northwind Labs IT — the seed world for the ITSM agent.
 // Fictional company, fictional people. Every session starts from this state.
 
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { withFinal } from "../../env/final.mjs";
+
 export const NOW = "2026-09-27T10:00:00+05:30";
+const AGENT_DIR = dirname(fileURLToPath(import.meta.url));
 
 export function createWorld() {
+  return withFinal(baseWorld(), AGENT_DIR);
+}
+
+function baseWorld() {
   return {
     now: NOW,
     users: [

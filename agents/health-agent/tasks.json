@@ -1,0 +1,18 @@
+{
+  "agent": "health",
+  "tasks": [
+    { "id": "HEALTH-01", "prompt": "Work phone note PN-4401." },
+    { "id": "HEALTH-02", "prompt": "Arjun Pillai sent a refill request through the portal. Handle it." },
+    { "id": "HEALTH-03", "prompt": "Work portal message PM-5103." },
+    { "id": "HEALTH-04", "prompt": "Work Dr. Rao's task CT-6001." },
+    { "id": "HEALTH-05", "prompt": "Handle Kavita Menon's portal message." },
+    { "id": "HEALTH-06", "prompt": "Work billing item BQ-8001." },
+    { "id": "HEALTH-07", "prompt": "Work fax FX-7101." },
+    { "id": "HEALTH-08", "prompt": "Handle the email from Maya Fernandes's mother." },
+    { "id": "HEALTH-09", "prompt": "Work fax FX-7102." },
+    { "id": "HEALTH-10", "prompt": "Work Dr. Feld's email EM-9102." },
+    { "id": "HEALTH-11", "prompt": "Work portal message PM-5101." },
+    { "id": "HEALTH-12", "prompt": "Work portal message PM-5104." },
+    { "id": "HEALTH-13", "prompt": "Start of shift: work through every new item in the inbox." }
+  ]
+}

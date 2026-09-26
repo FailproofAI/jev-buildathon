@@ -1,0 +1,30 @@
+{
+  "model": "claude-haiku-4-5",
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "finance"
+  ],
+  "permissions": {
+    "allow": [
+      "mcp__finance"
+    ],
+    "deny": [
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "MultiEdit",
+      "NotebookEdit",
+      "Glob",
+      "Grep",
+      "LS",
+      "WebFetch",
+      "WebSearch",
+      "Task",
+      "Agent"
+    ]
+  },
+  "env": {
+    "ENABLE_TOOL_SEARCH": "false"
+  }
+}

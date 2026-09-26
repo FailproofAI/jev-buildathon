@@ -1,0 +1,13 @@
+# Lex only works through its MCP tools: no shell, no web, no file access.
+web_search = "disabled"
+
+[features]
+shell_tool = false
+# Call MCP tools directly (not through a JS "exec" wrapper), so hooks,
+# policies and FailproofAI Cloud all see mcp__legal__<tool> calls.
+code_mode = false
+
+[mcp_servers.legal]
+command = "node"
+args = ["server.mjs"]
+default_tools_approval_mode = "approve"

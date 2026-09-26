@@ -2,3 +2,5 @@
 .smoke-*
 node_modules/
 *.buildathon-tmp
+final.json
+submission-*.md

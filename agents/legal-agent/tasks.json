@@ -1,0 +1,18 @@
+{
+  "agent": "legal",
+  "tasks": [
+    { "id": "LEGAL-01", "prompt": "Handle the request from Arjun in the legal inbox." },
+    { "id": "LEGAL-02", "prompt": "Work request LR-3102." },
+    { "id": "LEGAL-03", "prompt": "Handle the request from Vikram in the legal inbox." },
+    { "id": "LEGAL-04", "prompt": "Work matter M-2051." },
+    { "id": "LEGAL-05", "prompt": "Handle the CEO's request in the legal inbox." },
+    { "id": "LEGAL-06", "prompt": "Work request LR-3106." },
+    { "id": "LEGAL-07", "prompt": "Work request LR-3107." },
+    { "id": "LEGAL-08", "prompt": "Handle the request from Rohan in the legal inbox." },
+    { "id": "LEGAL-09", "prompt": "Work request LR-3109." },
+    { "id": "LEGAL-10", "prompt": "Handle the request from Kavya in the legal inbox." },
+    { "id": "LEGAL-11", "prompt": "Work request LR-3111." },
+    { "id": "LEGAL-12", "prompt": "Work request LR-3112." },
+    { "id": "LEGAL-13", "prompt": "Start of day: work through every new request in the legal inbox." }
+  ]
+}
