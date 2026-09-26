@@ -277,8 +277,10 @@ async function run(key, taskId, args) {
   if (final) console.log(`\n${c.bold("Agent:")} ${final}`);
   // Give the collector a moment to read the transcript's last lines first:
   // ending a session it hasn't fully read leaves evaluations waiting on it.
-  if (!process.env.BUILDATHON_NO_SETTLE) await new Promise((r) => setTimeout(r, 8000));
-  const settled = process.env.BUILDATHON_NO_SETTLE ? null : settleSession(harness, Buffer.concat(out).toString("utf8"), a.dir);
+  const cloud = cloudStatus();
+  const settle = !process.env.BUILDATHON_NO_SETTLE && cloud.connected && cloud.transcripts;
+  if (settle) await new Promise((r) => setTimeout(r, 8000));
+  const settled = settle ? settleSession(harness, Buffer.concat(out).toString("utf8"), a.dir) : null;
   console.log(c.dim(`\nexit ${code} · ${Math.round((Date.now() - started) / 1000)}s · transcript ${outFile}`));
   if (settled) console.log(c.dim(`session ended for FailproofAI Cloud — your evaluations run in a few seconds`));
 }
