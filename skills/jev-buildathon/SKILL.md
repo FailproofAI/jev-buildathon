@@ -25,7 +25,52 @@ This skill covers the buildathon. The umbrella skill covers the whole failproofa
 npx skills add FailproofAI/skills --skill failproofai -a claude-code    # or -a codex
 ```
 
-Route to it for: `failproofai config` problems, a daemon that isn't running, sessions not reaching the Cloud, Jev setup and modes (`failproofai jev status|test|setup`), the policy SDK in depth, packs and publishing, and `fp` Cloud commands. If it isn't installed and you need it, ask the user to run the command above.
+Route to it for anything deeper than the cheat sheet below: `failproofai config` problems, a daemon that isn't running, sessions not reaching the Cloud, Jev setup and modes, the policy SDK in depth, and the rest of `fp` (keys, alerts, audits, issues). For focused Cloud work there is also the `fp-cloud-cli` skill (`npx skills add FailproofAI/skills --skill fp-cloud-cli`). If a skill isn't installed and you need it, ask the user to run the install command.
+
+## The two CLIs (know which does what)
+
+FailproofAI has **two command-line tools**, and mixing them up is the most common mistake:
+
+| | `failproofai`: local enforcement | `fp`: FailproofAI Cloud |
+|---|---|---|
+| Install | `npm i -g failproofai@next` | `uv tool install fp-cloud-cli` (or `pipx install fp-cloud-cli`) |
+| Sign in | `failproofai config --token <team machine key>` | `fp login` (6-digit code by email), then `fp whoami` |
+| Job | Hooks into Claude Code/Codex, runs your policies before every tool call, uploads sessions through its daemon, connects Jev | Reads your team's org: sessions, events, evals, what policies blocked, SQL |
+
+**`failproofai` (this machine)**
+
+```bash
+failproofai config --token <key>   # connect: hooks + daemon + transcripts + Jev (writes ~/.failproofai/)
+failproofai config --status        # is it connected, and is the daemon running?
+failproofai policies               # the policies failproofai currently sees
+failproofai jev status             # Jev provider and mode (Cloud: provider failproofai)
+failproofai jev test               # one live Jev request, to check askJev will work
+```
+
+Your own policies are **files**, not Cloud deployments: `agents/<x>-agent/.failproofai/policies/*policies.mjs`. They're loaded from the agent folder on every tool call. Don't use `fp policies publish` or `fp fleet deploy` for the buildathon: Cloud-deployed policies can't import `policykit`, apply machine-wide, and aren't what `pack` submits.
+
+**`fp` (read your team's Cloud org)**
+
+Global flags go **before** the command (`fp --json sessions`, not `fp sessions --json`).
+
+```bash
+fp whoami                                                    # user, active org, permissions
+fp --json sessions --since 1h --agent-id claude-itsm-agent   # recent runs of one agent (codex-itsm-agent for Codex)
+fp --json events --session-id <id> --all                     # a run's full timeline (tool calls, results, blocks)
+fp --json events --full --session-id <id> --all              # the same, with raw payloads
+fp evals --agent-id claude-itsm-agent --aggregate            # eval score stats for one agent
+fp --json evals --session-id <id>                            # a session's eval results
+fp evals --score itsm_credential_exposure:0.5.. --since 1h   # sessions an eval flagged
+fp guardrails summary                                        # what your policies blocked
+fp --json query run --sql "SELECT ... FROM analytics.events WHERE ..."   # SQL over your org's events
+```
+
+Agent ids are `<harness>-<agent>-agent`: `claude-itsm-agent`, `codex-finance-agent`, and so on. Useful patterns:
+- **After a run:** find its session with `fp --json sessions --since 10m --agent-id ...`, then read `fp --json evals --session-id ...`, about 20 s after `buildathon run` ends.
+- **Tuning an eval:** list the sessions it flagged and read their event timelines. Check whether it caught the failures you saw, and nothing clean.
+- **Block log:** `fp guardrails summary`, or the Cloud **Policies** page.
+
+Evals themselves are created in the dashboard: **Evaluations → New**, where the drafting assistant writes the Jev envelope.
 
 ## Hard rules (break these and the team is disqualified)
 

@@ -28,10 +28,28 @@ node bin/buildathon.mjs doctor                       # all ✓
 
 ```bash
 node bin/buildathon.mjs skill                        # installs for Claude Code + Codex
-npx skills add FailproofAI/skills --skill failproofai  # the failproofai umbrella skill
+npx skills add FailproofAI/skills --skill failproofai  # the failproofai umbrella skill (local + Cloud)
+npx skills add FailproofAI/skills --skill fp-cloud-cli  # optional: focused fp / Cloud skill
 ```
 
 Then just ask your agent: *"help me improve the ITSM agent for the buildathon"*.
+
+## 1b. The two CLIs
+
+| | `failproofai` (your machine) | `fp` (FailproofAI Cloud) |
+|---|---|---|
+| Install | `npm i -g failproofai@next` | `uv tool install fp-cloud-cli` |
+| Sign in | `failproofai config --token <key>` | `fp login`, then `fp whoami` |
+| Use it for | Hooks, running your policies, uploading sessions, Jev | Reading your runs, evals and blocks |
+
+```bash
+failproofai config --status          # connected? daemon running?
+failproofai jev status               # Jev on? (provider: failproofai)
+fp --json sessions --since 1h --agent-id claude-itsm-agent
+fp --json events --session-id <id> --all        # one run's full timeline
+fp --json evals --session-id <id>               # its eval results
+fp guardrails summary                           # what your policies blocked
+```
 
 ## 2. The loop
 
