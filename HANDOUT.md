@@ -22,6 +22,8 @@ node bin/buildathon.mjs setup
 node bin/buildathon.mjs doctor                       # all ✓
 ```
 
+**Jev mode: keep it on shadow.** `setup` does this for you (or run `node bin/buildathon.mjs jev-shadow`). Jev's built-in checks are tuned for coding agents; in *enforce* mode they block ordinary work here (an email, a group grant) and cost you points. In shadow they only log, while your own policies, including their `askJev` questions, still decide.
+
 **Codex users:** export the gateway key we give you as `AIKIN_API_KEY` in your shell. Never put it in a file in the repo.
 
 **Optional: give your own coding agent the buildathon skill.** It knows this repo, the loop, the rules and the failproofai umbrella skill:

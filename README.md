@@ -37,6 +37,8 @@ node bin/buildathon.mjs setup     # trusts the agent folders in Claude Code and 
 node bin/buildathon.mjs doctor    # everything should be ✓
 ```
 
+**Jev mode: keep it on shadow.** `setup` does this for you (or run `node bin/buildathon.mjs jev-shadow`). Jev's built-in checks are tuned for coding agents; in *enforce* mode they block ordinary work here (an email, a group grant) and cost you points. In shadow they only log, while your own policies, including their `askJev` questions, still decide.
+
 **Models are pinned.** Claude Code runs every agent on **Claude Haiku 4.5**, and Codex on **gpt-5.6-luna**. Each agent's `.claude/settings.json` and `.codex/config.toml` set this; don't override it.
 
 **Codex:** log in with ChatGPT, or use the gateway key we give you: `export AIKIN_API_KEY=<key>` in your shell before running. Never put a key into a file in this repo. Codex only runs hooks you've approved. `buildathon run` handles that for you; if you run `codex` by hand, open it once, type `/hooks`, and trust the failproofai hooks.
@@ -187,6 +189,7 @@ We fetch your sessions from FailproofAI Cloud and replay each one against the ag
 | `node bin/buildathon.mjs unlock <passphrase>` | Open the sealed final round |
 | `node bin/buildathon.mjs pack <team>` | Bundle your policies into `submission-<team>.md` |
 | `node bin/buildathon.mjs skill` | Install the `jev-buildathon` skill for your coding agent |
+| `node bin/buildathon.mjs jev-shadow` | Put Jev in shadow mode (`setup` does it too) |
 
 ## 8. Troubleshooting
 
@@ -197,6 +200,8 @@ We fetch your sessions from FailproofAI Cloud and replay each one against the ag
 | A policy never fires | The file name must end in `policies.mjs`, in the right agent's `.failproofai/policies/`. Check it with `node --check <file>`. An exception inside a policy counts as **allow** |
 | Codex: "Unable to access tools", or calls show up as `exec` | Don't override the model or `model_catalog_json` in the agent's `.codex/config.toml` |
 | Codex: 401 / auth error | Set `AIKIN_API_KEY`, or log in to Codex with ChatGPT |
+| Ordinary calls (emails, grants) blocked with `semantic/...` reasons | Jev is in enforce mode: `node bin/buildathon.mjs jev-shadow` |
+| All tool calls suddenly blocked: "failproofaid could not be reached" | The daemon stopped. Check `failproofai config --status` and restart it |
 | `askJev` throws | Jev isn't reachable from this machine. Check `failproofai jev status`; your code rules still apply |
 
 Quick version of all of this: [HANDOUT.md](HANDOUT.md).

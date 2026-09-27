@@ -112,8 +112,30 @@ function setup() {
   else console.log(c.yellow("  ! Claude Code not found (npm i -g @anthropic-ai/claude-code) — skipped"));
   if (has("codex")) trustCodex(dirs);
   else console.log(c.yellow("  ! Codex not found (npm i -g @openai/codex) — skipped"));
+  jevShadow({ quiet: true });
   console.log(`\nAgents: ${list.map((a) => c.bold(a.key)).join(", ")}`);
   console.log(`Next: ${c.bold("buildathon doctor")}, then ${c.bold("buildathon tasks itsm")}.`);
+}
+
+/**
+ * Jev's built-in checks are tuned for coding agents: in enforce mode they block
+ * ordinary work here (an email, a group grant). In shadow they only log, while
+ * your own policies (including their askJev questions) still decide.
+ */
+function jevShadow({ quiet = false } = {}) {
+  const mode = cloudStatus().jevMode;
+  if (!has("failproofai") || !mode) {
+    if (!quiet) console.log(c.yellow("  ! Jev isn't set up on this machine — run: failproofai config --token <your key>"));
+    return;
+  }
+  if (mode === "shadow") {
+    console.log(`  ${c.green("✓")} Jev is in shadow mode (built-in checks log only; your policies decide)`);
+    return;
+  }
+  const r = spawnSync("failproofai", ["jev", "setup", "--mode", "shadow"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 60000 });
+  const now = cloudStatus().jevMode;
+  if (now === "shadow") console.log(`  ${c.green("✓")} Jev switched from ${mode} to shadow mode (built-in checks log only; your policies decide)`);
+  else console.log(c.yellow(`  ! Could not switch Jev to shadow (still ${now}). Run: failproofai jev setup --mode shadow${r.stderr ? `\n    ${r.stderr.trim().split("\n")[0]}` : ""}`));
 }
 
 // ---- doctor ----------------------------------------------------------------
@@ -154,6 +176,7 @@ function cloudStatus() {
     transcripts: cfg.collector?.sessions === true,
     daemon: existsSync(socket),
     jev: jev ? `${jev.provider ?? "typesafe"}${jev.mode ? `, ${jev.mode} mode` : ""}` : null,
+    jevMode: jev ? jev.mode ?? "enforce" : null,
   };
 }
 
@@ -177,7 +200,8 @@ function doctor() {
   line(cloud.connected, cloud.connected ? `connected to ${cloud.url}${cloud.org ? ` (org ${cloud.org})` : ""}` : "not connected", "failproofai config --token <the key we gave you>");
   line(cloud.transcripts, cloud.transcripts ? "uploads session transcripts (we score from them)" : "session transcripts are OFF, so your sessions can't be scored", "failproofai config --token <your key>   (without --no-transcripts)");
   line(cloud.daemon, cloud.daemon ? "failproofaid is running (it does the uploading)" : "failproofaid is not running, so nothing reaches the Cloud", "failproofai config, then check failproofai config --status");
-  console.log(`  ${c.dim(`· Jev: ${cloud.jev ?? "not set up"}`)}`);
+  if (cloud.jevMode === "enforce") line(false, `Jev: ${cloud.jev} — its built-in coding checks will block ordinary agent work`, "node bin/buildathon.mjs jev-shadow");
+  else console.log(`  ${c.dim(`· Jev: ${cloud.jev ?? "not set up"}`)}`);
   console.log(c.bold("Agents"));
   for (const a of agents()) {
     let n = 0;
@@ -501,6 +525,7 @@ switch (cmd) {
   case "unlock": unlock(rest[0]); break;
   case "pack": pack(rest[0]); break;
   case "skill": skill(); break;
+  case "jev-shadow": jevShadow(); break;
   default:
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 }

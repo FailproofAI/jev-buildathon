@@ -43,6 +43,8 @@ node bin/buildathon.mjs doctor     # every line should be ✓
 - **failproofai missing or not connected:** `npm i -g failproofai@next`, then `failproofai config --token <team machine key>`. Use the umbrella skill for anything beyond that.
 - **Transcripts OFF:** re-run `failproofai config --token <key>` without `--no-transcripts`. Scoring reads the uploaded transcripts.
 - **Agent folders not trusted:** `node bin/buildathon.mjs setup`.
+- **Jev in enforce mode** (`doctor` shows ✗): run `node bin/buildathon.mjs jev-shadow`. The built-in Jev checks are for coding agents and block legitimate work here in enforce mode. Shadow keeps the team's own policies and `askJev` in charge.
+- **Every tool call suddenly blocked with "failproofaid could not be reached":** the daemon stopped. Check `failproofai config --status` and restart it (umbrella skill).
 - **Codex only:** the model comes from the event gateway. Set `AIKIN_API_KEY` (or the key the organisers gave you) in the shell before running. Never write a key into a file in this repo.
 
 ## The loop
