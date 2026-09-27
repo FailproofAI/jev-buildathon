@@ -257,9 +257,10 @@ async function run(key, taskId, args) {
 
   console.log(`${c.bold(a.key)} ${c.bold(t.id)} on ${c.bold(harness)}: ${t.prompt}`);
   const started = Date.now();
+  const runId = `${process.pid}${started.toString(36)}`;
   const out = [];
   const code = await new Promise((res) => {
-    const p = spawn(cmd, cargs, { cwd: a.dir, stdio: ["ignore", "pipe", "pipe"], env: process.env });
+    const p = spawn(cmd, cargs, { cwd: a.dir, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, BUILDATHON_RUN_ID: runId } });
     p.stdout.on("data", (d) => out.push(d));
     p.stderr.on("data", (d) => process.env.BUILDATHON_VERBOSE && process.stderr.write(d));
     p.on("close", res);
@@ -268,10 +269,16 @@ async function run(key, taskId, args) {
   const final = finalText(harness, Buffer.concat(out).toString("utf8"));
   console.log(c.dim(`\nTool calls:`));
   let n = 0;
-  for (const f of newestLogs(a.dir, started - 1000)) n += printCalls(f);
+  const mine = newestLogs(a.dir, started - 1000);
+  const tagged = mine.filter((f) => f.includes(`-run-${runId}`));
+  for (const f of tagged.length ? tagged : mine.filter((f) => !f.includes("-run-"))) n += printCalls(f);
   // A call a policy blocked never reaches the agent's server, so it is not in
   // the server's call log above; find it in the harness output instead.
-  const blocked = blockedCalls(harness, Buffer.concat(out).toString("utf8"));
+  const raw = Buffer.concat(out).toString("utf8");
+  // Codex's --json stream leaves a hook-denied call out entirely; its session
+  // rollout still has the call and the hook's reason, so read that instead.
+  const rollout = harness === "codex" ? transcriptFile("codex", raw, a.dir) : null;
+  const blocked = rollout ? blockedFromRollout(rollout) : blockedCalls(harness, raw);
   for (const b of blocked) console.log(`  ${c.red("⊘")} ${c.bold(b.tool)} ${c.dim(`blocked: ${b.reason.length > 160 ? b.reason.slice(0, 157) + "..." : b.reason}`)}`);
   if (!n && !blocked.length) console.log(c.dim("  (none)"));
   if (final) console.log(`\n${c.bold("Agent:")} ${final}`);
@@ -280,7 +287,7 @@ async function run(key, taskId, args) {
   const cloud = cloudStatus();
   const settle = !process.env.BUILDATHON_NO_SETTLE && cloud.connected && cloud.transcripts;
   if (settle) await new Promise((r) => setTimeout(r, 8000));
-  const settled = settle ? settleSession(harness, Buffer.concat(out).toString("utf8"), a.dir) : null;
+  const settled = settle ? settleSession(harness, raw, a.dir) : null;
   console.log(c.dim(`\nexit ${code} · ${Math.round((Date.now() - started) / 1000)}s · transcript ${outFile}`));
   if (settled) console.log(c.dim(`session ended for FailproofAI Cloud — your evaluations run in a few seconds`));
 }
@@ -292,6 +299,43 @@ async function run(key, taskId, args) {
  * seconds instead of ten minutes. BUILDATHON_NO_SETTLE=1 turns this off.
  */
 function settleSession(harness, raw, cwd) {
+  const file = transcriptFile(harness, raw, cwd);
+  if (!file) return null;
+  const past = new Date(Date.now() - 11 * 60 * 1000);
+  try {
+    utimesSync(file, past, past);
+    return file;
+  } catch {
+    return null;
+  }
+}
+
+/** Calls in a Codex rollout whose output did not come from the agent's server. */
+function blockedFromRollout(file) {
+  const calls = new Map();
+  const out = [];
+  for (const l of readFileSync(file, "utf8").split("\n")) {
+    let m;
+    try {
+      m = JSON.parse(l);
+    } catch {
+      continue;
+    }
+    const p = m.type === "response_item" ? m.payload : null;
+    if (p?.type === "function_call") calls.set(p.call_id, p.name);
+    if (p?.type === "function_call_output" && calls.has(p.call_id)) {
+      const t = typeof p.output === "string" ? p.output : JSON.stringify(p.output);
+      if (!/_env/.test(t) && /failproofai|hook/i.test(t)) {
+        const reason = /because: ([\s\S]*?)(?:, as per the policy configured by the user|$)/.exec(t)?.[1] ?? t;
+        out.push({ tool: calls.get(p.call_id), reason: reason.trim() });
+      }
+    }
+  }
+  return out;
+}
+
+/** The harness's own session file for this run (Claude transcript / Codex rollout). */
+function transcriptFile(harness, raw, cwd) {
   let id = null;
   for (const l of raw.split("\n")) {
     try {
@@ -320,14 +364,7 @@ function settleSession(harness, raw, cwd) {
       }
     }
   }
-  if (!file) return null;
-  const past = new Date(Date.now() - 11 * 60 * 1000);
-  try {
-    utimesSync(file, past, past);
-    return file;
-  } catch {
-    return null;
-  }
+  return file;
 }
 
 /** Extra harness flags as a JSON array in an env var (used by the organisers'
@@ -438,6 +475,22 @@ function pack(team) {
   console.log(`${c.green("✓")} ${files} policy files → ${out}\nUpload this file where the organisers tell you. Your Jev evaluations are read straight from FailproofAI Cloud.`);
 }
 
+/** Install this repo's skill for Claude Code and Codex (user scope). */
+function skill() {
+  const src = join(REPO, "skills", "jev-buildathon");
+  const targets = [
+    [has("claude"), join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "skills", "jev-buildathon"), "Claude Code"],
+    [has("codex"), join(process.env.CODEX_HOME || join(homedir(), ".codex"), "skills", "jev-buildathon"), "Codex"],
+  ];
+  for (const [present, dest, label] of targets) {
+    if (!present) continue;
+    mkdirSync(dest, { recursive: true });
+    for (const f of readdirSync(src)) writeFileSync(join(dest, f), readFileSync(join(src, f)));
+    console.log(`  ${c.green("✓")} ${label}: ${dest}`);
+  }
+  console.log(`\nAlso install the failproofai umbrella skill:\n  ${c.bold("npx skills add FailproofAI/skills --skill failproofai")}`);
+}
+
 const [cmd, ...rest] = process.argv.slice(2);
 switch (cmd) {
   case "setup": setup(); break;
@@ -447,6 +500,7 @@ switch (cmd) {
   case "log": log(rest[0], rest.slice(1)); break;
   case "unlock": unlock(rest[0]); break;
   case "pack": pack(rest[0]); break;
+  case "skill": skill(); break;
   default:
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 10).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 }

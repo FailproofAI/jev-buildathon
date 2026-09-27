@@ -49,6 +49,14 @@ const parseJson = (s) => {
   try {
     return JSON.parse(s);
   } catch {
+    // Codex prefixes tool output with "Wall time: … Output:"; the tool's JSON follows.
+    const i = s.indexOf("{");
+    const j = s.lastIndexOf("}");
+    if (i >= 0 && j > i) {
+      try {
+        return JSON.parse(s.slice(i, j + 1));
+      } catch {}
+    }
     return s;
   }
 };
@@ -84,7 +92,7 @@ export function history(ctx) {
     }
     // Codex rollout
     const p = r?.type === "response_item" ? r.payload : null;
-    if (p?.type === "function_call" || p?.type === "custom_tool_call") add(p.call_id, p.name, parseJson(p.arguments));
+    if (p?.type === "function_call" || p?.type === "custom_tool_call") add(p.call_id, p.namespace ? `${p.namespace}__${p.name}` : p.name, parseJson(p.arguments));
     if (p?.type === "function_call_output" || p?.type === "custom_tool_call_output") settle(p.call_id, p.output);
   }
   return calls;

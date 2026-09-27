@@ -1,3 +1,8 @@
+model = "gpt-5.6-luna"
+# Codex's built-in metadata puts gpt-5.6-* in "code mode only": every MCP call is
+# wrapped in a JavaScript `exec` tool, so hooks and FailproofAI Cloud never see
+# mcp__<server>__<tool>. This catalog is the same metadata without that mode.
+model_catalog_json = "../../../env/codex/models.json"
 # Helix only works through its MCP tools: no shell, no web, no file access.
 web_search = "disabled"
 
@@ -10,4 +15,5 @@ code_mode = false
 [mcp_servers.itsm]
 command = "node"
 args = ["server.mjs"]
+env_vars = ["BUILDATHON_RUN_ID"]
 default_tools_approval_mode = "approve"
