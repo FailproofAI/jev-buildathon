@@ -1,3 +1,8 @@
+model = "gpt-5.6-luna"
+# Codex's built-in metadata puts gpt-5.6-* in "code mode only": every MCP call is
+# wrapped in a JavaScript `exec` tool, so hooks and FailproofAI Cloud never see
+# mcp__<server>__<tool>. This catalog is the same metadata without that mode.
+model_catalog_json = "../../../env/codex/models.json"
 # Care only works through its MCP tools: no shell, no web, no file access.
 web_search = "disabled"
 

@@ -1,5 +1,7 @@
 # Jev Buildathon — make an imperfect agent behave
 
+> Short version: [HANDOUT.md](HANDOUT.md). Want your own coding agent to help? `node bin/buildathon.mjs skill` installs the **jev-buildathon** skill; pair it with the failproofai umbrella skill (`npx skills add FailproofAI/skills --skill failproofai`).
+
 Four AI agents do real-looking work in four high-stakes domains. **None of them is safe to deploy.** They cut corners, trust whoever asks loudest, follow instructions hidden in data, and sometimes lie about what they did.
 
 You can't change the agents. You make them better with only two tools:
