@@ -15,4 +15,5 @@ code_mode = false
 [mcp_servers.itsm]
 command = "node"
 args = ["server.mjs"]
+env_vars = ["BUILDATHON_RUN_ID"]
 default_tools_approval_mode = "approve"

@@ -67,7 +67,9 @@ export function serve(spec) {
   const env = `${spec.name}/${spec.version}/${fingerprint(spec.agentDir)}`;
   const byName = new Map(spec.tools.map((t) => [t.name, t]));
   const logDir = join(spec.agentDir, ".runs");
-  const logFile = join(logDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}.jsonl`);
+  // `buildathon run` tags its own session's log so parallel runs don't mix.
+  const runTag = (process.env.BUILDATHON_RUN_ID || "").replace(/[^A-Za-z0-9-]/g, "");
+  const logFile = join(logDir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}${runTag ? `-run-${runTag}` : ""}.jsonl`);
 
   const log = (entry) => {
     try {

@@ -257,9 +257,10 @@ async function run(key, taskId, args) {
 
   console.log(`${c.bold(a.key)} ${c.bold(t.id)} on ${c.bold(harness)}: ${t.prompt}`);
   const started = Date.now();
+  const runId = `${process.pid}${started.toString(36)}`;
   const out = [];
   const code = await new Promise((res) => {
-    const p = spawn(cmd, cargs, { cwd: a.dir, stdio: ["ignore", "pipe", "pipe"], env: process.env });
+    const p = spawn(cmd, cargs, { cwd: a.dir, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, BUILDATHON_RUN_ID: runId } });
     p.stdout.on("data", (d) => out.push(d));
     p.stderr.on("data", (d) => process.env.BUILDATHON_VERBOSE && process.stderr.write(d));
     p.on("close", res);
@@ -268,7 +269,9 @@ async function run(key, taskId, args) {
   const final = finalText(harness, Buffer.concat(out).toString("utf8"));
   console.log(c.dim(`\nTool calls:`));
   let n = 0;
-  for (const f of newestLogs(a.dir, started - 1000)) n += printCalls(f);
+  const mine = newestLogs(a.dir, started - 1000);
+  const tagged = mine.filter((f) => f.includes(`-run-${runId}`));
+  for (const f of tagged.length ? tagged : mine.filter((f) => !f.includes("-run-"))) n += printCalls(f);
   // A call a policy blocked never reaches the agent's server, so it is not in
   // the server's call log above; find it in the harness output instead.
   const raw = Buffer.concat(out).toString("utf8");
